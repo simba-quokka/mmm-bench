@@ -1,45 +1,77 @@
-# Data-scarce scenario: 18 months, new channel with only 6 months history
-# Tests prior handling — tools with good priors should outperform here.
+# Data-scarce CPG scenario — 18 months weekly.
+# TikTok only has 6 months of history (new channel).
+# Tests how well tools handle short history and uneven channel coverage.
+# Tools with good default priors should outperform here.
 
 name: data_scarce
-description: "18 months weekly, TikTok only has 6 months history, tests prior-dependent tools"
+description: "CPG 4-channel, 18 months, TikTok new (6 months only), tests prior quality"
 n_weeks: 78
 seed: 7
-baseline: 35000
-trend_slope: 50.0
-seasonality_amplitude: 0.18
-noise_sigma: 2000
+baseline: 350000
+trend_slope: 400.0
+seasonality_amplitude: 0.14
+noise_sigma: 15000
 
 channels:
   - name: paid_search
     spend_mean: 40000
     spend_std: 10000
+    spend_pattern: always_on
+    cpm: 7.5
+    cpm_cv: 0.18
     adstock_type: geometric
-    decay: 0.2
+    decay: 0.20
     alpha: 1.4
-    true_coefficient: 1.1
+    true_coefficient: 99268     # target ROI ~1.10
 
   - name: paid_social
     spend_mean: 30000
     spend_std: 12000
+    spend_pattern: always_on
+    cpm: 9.0
+    cpm_cv: 0.22
     adstock_type: geometric
     decay: 0.35
     alpha: 1.0
-    true_coefficient: 0.8
+    true_coefficient: 48497     # target ROI ~0.80
 
   - name: tv
     spend_mean: 60000
     spend_std: 25000
+    spend_pattern: flighted
+    flight_on_rate: 0.50
+    cpm: 22.0
+    cpm_cv: 0.12
     adstock_type: geometric
-    decay: 0.6
+    decay: 0.60
     alpha: 0.75
-    true_coefficient: 0.3
+    true_coefficient: 15268     # target ROI ~0.25
 
   - name: tiktok
-    # Only active for last 26 weeks — simulated by low spend for first 52 weeks
     spend_mean: 8000
     spend_std: 5000
+    spend_pattern: always_on
+    cpm: 6.0                    # new platform, decent CPM
+    cpm_cv: 0.25
     adstock_type: geometric
     decay: 0.25
     alpha: 1.2
-    true_coefficient: 0.95
+    true_coefficient: 28608     # target ROI ~0.95
+
+controls:
+  - name: price_index
+    true_coefficient: -90000
+    pattern: ar1
+    ar1_rho: 0.80
+    ar1_std: 0.05
+
+  - name: distribution_index
+    true_coefficient: 60000
+    pattern: trend
+    trend_slope: 0.012
+
+  - name: competitor_adspend
+    true_coefficient: -28000
+    pattern: ar1
+    ar1_rho: 0.65
+    ar1_std: 1.0

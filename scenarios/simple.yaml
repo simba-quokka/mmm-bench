@@ -1,36 +1,70 @@
-# Simple scenario: 3 channels, 2 years weekly, clean data, no correlation
+# Simple CPG scenario — 3 channels, 2 years weekly, independent spend, low noise.
+# TV is flighted (on 50% of weeks). Search and social are always-on.
+# Controls: relative price index, distribution ACV, competitor adspend.
 # Easy case — all tools should perform well here.
 
 name: simple
-description: "3 channels, 2 years weekly data, independent spend, low noise"
+description: "CPG 3-channel: flighted TV + always-on digital, 2 yrs weekly, price/distribution/competitor controls"
 n_weeks: 104
 seed: 42
-baseline: 50000
-trend_slope: 10.0
-seasonality_amplitude: 0.12
-noise_sigma: 1500
+baseline: 500000
+trend_slope: 150.0
+seasonality_amplitude: 0.10
+noise_sigma: 12000
 
 channels:
   - name: tv
     spend_mean: 80000
-    spend_std: 20000
+    spend_std: 22000
+    spend_pattern: flighted
+    flight_on_rate: 0.55        # active ~57 weeks out of 104 (4-week bursts)
+    cpm: 22.0                   # $22 CPM → ~3.6M impressions per $80k week
+    cpm_cv: 0.12
     adstock_type: geometric
     decay: 0.65
     alpha: 0.8
-    true_coefficient: 0.35
+    true_coefficient: 22971     # target ROI ~0.28
 
   - name: paid_search
     spend_mean: 30000
     spend_std: 8000
+    spend_pattern: always_on
+    cpm: 8.0                    # $8 CPM → ~3.75M impressions per $30k week
+    cpm_cv: 0.18
     adstock_type: geometric
-    decay: 0.2
+    decay: 0.20
     alpha: 1.5
-    true_coefficient: 1.2
+    true_coefficient: 112549    # target ROI ~1.35
 
   - name: paid_social
     spend_mean: 25000
     spend_std: 10000
+    spend_pattern: always_on
+    cpm: 9.0                    # $9 CPM → ~2.8M impressions per $25k week
+    cpm_cv: 0.20
     adstock_type: geometric
     decay: 0.35
     alpha: 1.1
-    true_coefficient: 0.75
+    true_coefficient: 57599     # target ROI ~0.75
+
+controls:
+  # Relative price index (1.0 = average shelf price)
+  # AR(1) variation around 0; higher price → lower revenue
+  - name: price_index
+    true_coefficient: -120000   # 1-unit (1 std) price rise → -$120k revenue
+    pattern: ar1
+    ar1_rho: 0.85
+    ar1_std: 0.05               # ±5% price variation typical for CPG
+
+  # Weighted distribution / ACV — slow upward trend as brand gains shelf space
+  - name: distribution_index
+    true_coefficient: 80000     # each unit of distribution gain → +$80k revenue
+    pattern: trend
+    trend_slope: 0.008          # gradual distribution build over 2 years
+
+  # Competitor above-the-line adspend index (0 = avg, +1 = 1-std above avg)
+  - name: competitor_adspend
+    true_coefficient: -45000    # competitor burst → -$45k revenue (conquest)
+    pattern: ar1
+    ar1_rho: 0.70
+    ar1_std: 1.0

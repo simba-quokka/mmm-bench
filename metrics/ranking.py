@@ -35,7 +35,7 @@ def ranking_accuracy(
     est_ranking = _to_ranked_list(estimated_rois)
 
     if not true_ranking or not est_ranking:
-        return {"top1_correct": False, "top2_correct": 0.0, "full_accuracy": 0.0, "spearman_rho": 0.0}
+        return {"top1_correct": False, "top2_overlap": 0.0, "pairwise_accuracy": 0.0}
 
     # Top-1
     top1_correct = true_ranking[0] == est_ranking[0] if est_ranking else False

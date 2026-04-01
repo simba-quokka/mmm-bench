@@ -1,82 +1,141 @@
-# Complex scenario: 8 channels, 3 years, correlated spend, delayed adstock
+# Complex CPG scenario — 8 channels, 3 years, correlated spend, delayed adstock.
+# TV correlated with OOH (same campaign planning cycle).
+# Search and social correlated (performance budgets shift together).
+# Controls: price, distribution, competitor, temperature (beverage category), trade promo.
 # Mid-difficulty — tests handling of multicollinearity and varied adstock types.
 
 name: complex
-description: "8 channels, 3 years, correlated spend (TV/OOH, Search/Social), delayed adstock on brand"
+description: "CPG 8-channel: TV/OOH correlated, search/social correlated, 3 yrs, 5 controls"
 n_weeks: 156
 seed: 99
-baseline: 120000
-trend_slope: 25.0
-seasonality_amplitude: 0.15
-noise_sigma: 3000
+baseline: 1200000
+trend_slope: 500.0
+seasonality_amplitude: 0.12
+noise_sigma: 25000
 
 channels:
   - name: tv
     spend_mean: 120000
     spend_std: 35000
+    spend_pattern: flighted
+    flight_on_rate: 0.50
+    cpm: 20.0                   # ~6M impressions per $120k on-week
+    cpm_cv: 0.10
     adstock_type: delayed
     decay: 0.55
     peak_delay: 2
     alpha: 0.7
-    true_coefficient: 0.28
+    true_coefficient: 26115     # target ROI ~0.22
 
   - name: ooh
     spend_mean: 40000
     spend_std: 8000
+    spend_pattern: flighted
+    flight_on_rate: 0.55
+    cpm: 6.0                    # ~6.7M impressions per $40k week
+    cpm_cv: 0.08
     adstock_type: geometric
-    decay: 0.5
+    decay: 0.50
     alpha: 0.9
-    true_coefficient: 0.18
-    correlated_with: 0   # correlated with tv (brand campaigns run together)
+    true_coefficient: 10104     # target ROI ~0.15
+    correlated_with: 0          # correlated with TV
     correlation: 0.65
 
   - name: paid_search
     spend_mean: 50000
     spend_std: 12000
+    spend_pattern: always_on
+    cpm: 7.0
+    cpm_cv: 0.20
     adstock_type: geometric
     decay: 0.18
     alpha: 1.4
-    true_coefficient: 1.35
+    true_coefficient: 189784    # target ROI ~1.40
 
   - name: paid_social
     spend_mean: 45000
     spend_std: 15000
+    spend_pattern: always_on
+    cpm: 9.5
+    cpm_cv: 0.22
     adstock_type: geometric
-    decay: 0.3
+    decay: 0.30
     alpha: 1.0
-    true_coefficient: 0.85
-    correlated_with: 2   # correlated with paid_search (performance budget moves together)
+    true_coefficient: 90292     # target ROI ~0.90
+    correlated_with: 2          # correlated with paid_search
     correlation: 0.55
 
   - name: display
     spend_mean: 20000
     spend_std: 8000
+    spend_pattern: always_on
+    cpm: 4.0                    # ~5M impressions per $20k week
+    cpm_cv: 0.25
     adstock_type: geometric
     decay: 0.25
     alpha: 1.8
-    true_coefficient: 0.45
+    true_coefficient: 36036     # target ROI ~0.45
 
   - name: email
     spend_mean: 5000
     spend_std: 2000
+    spend_pattern: always_on
+    cpm: 0.5                    # very cheap — email sends
+    cpm_cv: 0.10
     adstock_type: geometric
-    decay: 0.1
+    decay: 0.10
     alpha: 2.5
-    true_coefficient: 2.1
+    true_coefficient: 64282     # target ROI ~2.50
 
   - name: youtube
     spend_mean: 35000
     spend_std: 12000
+    spend_pattern: always_on
+    cpm: 12.0
+    cpm_cv: 0.15
     adstock_type: delayed
     decay: 0.45
     peak_delay: 1
     alpha: 1.1
-    true_coefficient: 0.6
+    true_coefficient: 46751     # target ROI ~0.65
 
   - name: affiliates
     spend_mean: 15000
     spend_std: 5000
+    spend_pattern: always_on
+    cpm: 3.0
+    cpm_cv: 0.30
     adstock_type: geometric
     decay: 0.05
     alpha: 3.0
-    true_coefficient: 1.8
+    true_coefficient: 356662    # target ROI ~2.00
+
+controls:
+  - name: price_index
+    true_coefficient: -380000
+    pattern: ar1
+    ar1_rho: 0.82
+    ar1_std: 0.05
+
+  - name: distribution_index
+    true_coefficient: 220000
+    pattern: trend
+    trend_slope: 0.006
+
+  - name: competitor_adspend
+    true_coefficient: -95000
+    pattern: ar1
+    ar1_rho: 0.68
+    ar1_std: 1.0
+
+  # Temperature index (seasonal — relevant for beverage / FMCG categories)
+  - name: temperature_index
+    true_coefficient: 55000
+    pattern: seasonal
+    seasonality_amplitude: 1.0
+
+  # Trade promotion / feature-and-display activity
+  - name: trade_promo
+    true_coefficient: 180000
+    pattern: binary
+    binary_rate: 0.18

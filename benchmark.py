@@ -21,7 +21,7 @@ from rich.table import Table
 
 from data.generator import simulate_dataset
 from scenarios import load_scenario, load_all_scenarios
-from runners import PyMCMarketingRunner, MeridianRunner, DecisionPacksRunner
+from runners import PyMCMarketingRunner, PyMCMarketingTanhRunner, MeridianRunner, DecisionPacksRunner
 from metrics import compute_all_metrics
 
 app = typer.Typer(help="MMM benchmark runner")
@@ -32,6 +32,7 @@ README_PATH = Path("README.md")
 
 RUNNERS = {
     "pymc-marketing": PyMCMarketingRunner,
+    "pymc-marketing-tanh": PyMCMarketingTanhRunner,
     "meridian": MeridianRunner,
     "decision-packs": DecisionPacksRunner,
 }
@@ -68,8 +69,12 @@ def run(
 
         df, ground_truth = simulate_dataset(sc)
         channels = [ch.name for ch in sc.channels]
+        control_cols = ground_truth.get("control_cols", [])
 
-        console.print(f"  {len(df)} weeks · {len(channels)} channels: {', '.join(channels)}")
+        console.print(
+            f"  {len(df)} weeks · {len(channels)} channels: {', '.join(channels)}"
+            + (f" · controls: {', '.join(control_cols)}" if control_cols else "")
+        )
 
         for tool_name in tools_to_run:
             runner_cls = RUNNERS.get(tool_name)
@@ -81,7 +86,7 @@ def run(
             console.print(f"\n  Running [bold]{tool_name}[/bold] v{runner.tool_version}...")
 
             try:
-                result = runner.run(df, channels)
+                result = runner.run(df, channels, control_cols=control_cols)
                 result.scenario_name = scenario_name
             except Exception as e:
                 console.print(f"  [red]FAILED: {e}[/red]")
@@ -125,11 +130,65 @@ def run(
 def _print_result_row(m: dict):
     status = "[green]OK[/green]" if m["converged"] else "[yellow]WARN[/yellow]"
     console.print(
-        f"    {status} ROI accuracy: {m['roi_accuracy']:.1%} | "
+        f"    {status} Rel ROI acc: {m['rel_roi_accuracy']:.1%} | "
+        f"Abs ROI acc: {m['abs_roi_accuracy']:.1%} | "
         f"Ranking: {m['pairwise_accuracy']:.1%} pairwise | "
-        f"Spearman ρ: {m['spearman_rho']:.2f} | "
+        f"Spearman rho: {m['spearman_rho']:.2f} | "
         f"{m['runtime_seconds']:.0f}s"
     )
+    _print_per_channel(m)
+
+
+def _print_per_channel(m: dict):
+    """Per-channel ROI breakdown table printed immediately after the summary line."""
+    true_rois = m.get("true_rois", {})
+    est_rois = m.get("estimated_rois", {})
+    per_rel = m.get("per_channel_rel", {})
+    per_abs = m.get("per_channel_abs", {})
+
+    if not true_rois:
+        return
+
+    # Header
+    console.print(
+        f"    {'':2}{'Channel':<16} {'True ROI':>9} {'Est ROI':>9} "
+        f"{'Abs Err':>9} {'Rel Err':>9}"
+    )
+    console.print(f"    {'':2}{'-'*54}")
+
+    channels = list(true_rois.keys())
+    for ch in channels:
+        t = true_rois.get(ch)
+        e = est_rois.get(ch)
+        abs_err = per_abs.get(ch)
+        rel_err = per_rel.get(ch)
+
+        t_str = f"{t:.3f}" if t is not None else "   -"
+        e_str = f"{e:.3f}" if e is not None else "   -"
+
+        # colour abs error: green <30%, yellow <75%, red >=75%
+        if abs_err is None:
+            abs_str = "    -"
+        elif abs_err < 0.30:
+            abs_str = f"[green]{abs_err:.1%}[/green]"
+        elif abs_err < 0.75:
+            abs_str = f"[yellow]{abs_err:.1%}[/yellow]"
+        else:
+            abs_str = f"[red]{abs_err:.1%}[/red]"
+
+        if rel_err is None:
+            rel_str = "    -"
+        elif rel_err < 0.20:
+            rel_str = f"[green]{rel_err:.1%}[/green]"
+        elif rel_err < 0.50:
+            rel_str = f"[yellow]{rel_err:.1%}[/yellow]"
+        else:
+            rel_str = f"[red]{rel_err:.1%}[/red]"
+
+        console.print(
+            f"    {'':2}{ch:<16} {t_str:>9} {e_str:>9} "
+            f"{abs_str:>9} {rel_str:>9}"
+        )
 
 
 def _print_leaderboard(all_metrics: list[dict]):
@@ -140,18 +199,20 @@ def _print_leaderboard(all_metrics: list[dict]):
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("Tool")
     table.add_column("Scenario")
-    table.add_column("ROI Acc.")
-    table.add_column("Pairwise Rank")
-    table.add_column("Spearman ρ")
-    table.add_column("Converged")
-    table.add_column("Runtime")
+    table.add_column("Rel ROI Acc.", justify="right")   # primary
+    table.add_column("Abs ROI Acc.", justify="right")   # secondary
+    table.add_column("Pairwise", justify="right")
+    table.add_column("Spearman", justify="right")
+    table.add_column("Conv.", justify="center")
+    table.add_column("Runtime", justify="right")
 
-    for m in all_metrics:
-        converged = "[green]✓[/green]" if m["converged"] else "[yellow]⚠[/yellow]"
+    for m in sorted(all_metrics, key=lambda x: x["rel_roi_accuracy"], reverse=True):
+        converged = "[green]Y[/green]" if m["converged"] else "[yellow]![/yellow]"
         table.add_row(
             m["tool"],
             m["scenario"],
-            f"{m['roi_accuracy']:.1%}",
+            f"{m['rel_roi_accuracy']:.1%}",
+            f"{m['abs_roi_accuracy']:.1%}",
             f"{m['pairwise_accuracy']:.1%}",
             f"{m['spearman_rho']:.2f}",
             converged,
@@ -160,13 +221,67 @@ def _print_leaderboard(all_metrics: list[dict]):
 
     console.print(table)
 
+    # Per-channel detail table grouped by scenario
+    scenarios_seen = dict.fromkeys(m["scenario"] for m in all_metrics)
+    for scenario_name in scenarios_seen:
+        scenario_metrics = [m for m in all_metrics if m["scenario"] == scenario_name]
+        if not any(m.get("true_rois") for m in scenario_metrics):
+            continue
+
+        console.rule(f"[bold]Per-channel ROI detail — {scenario_name}")
+
+        # Collect all channels for this scenario
+        channels = list(next(m["true_rois"] for m in scenario_metrics if m.get("true_rois")).keys())
+        tools = [m["tool"] for m in scenario_metrics]
+
+        ch_table = Table(show_header=True, header_style="bold magenta")
+        ch_table.add_column("Channel", style="bold")
+        ch_table.add_column("True ROI", justify="right")
+        for m in scenario_metrics:
+            ch_table.add_column(f"{m['tool']}\nEst ROI", justify="right")
+            ch_table.add_column(f"{m['tool']}\nAbs Err", justify="right")
+            ch_table.add_column(f"{m['tool']}\nRel Err", justify="right")
+
+        for ch in channels:
+            row = [ch]
+            true_roi = scenario_metrics[0]["true_rois"].get(ch)
+            row.append(f"{true_roi:.3f}" if true_roi is not None else "-")
+            for m in scenario_metrics:
+                e = m.get("estimated_rois", {}).get(ch)
+                abs_err = m.get("per_channel_abs", {}).get(ch)
+                rel_err = m.get("per_channel_rel", {}).get(ch)
+
+                row.append(f"{e:.3f}" if e is not None else "-")
+
+                if abs_err is None:
+                    row.append("-")
+                elif abs_err < 0.30:
+                    row.append(f"[green]{abs_err:.1%}[/green]")
+                elif abs_err < 0.75:
+                    row.append(f"[yellow]{abs_err:.1%}[/yellow]")
+                else:
+                    row.append(f"[red]{abs_err:.1%}[/red]")
+
+                if rel_err is None:
+                    row.append("-")
+                elif rel_err < 0.20:
+                    row.append(f"[green]{rel_err:.1%}[/green]")
+                elif rel_err < 0.50:
+                    row.append(f"[yellow]{rel_err:.1%}[/yellow]")
+                else:
+                    row.append(f"[red]{rel_err:.1%}[/red]")
+
+            ch_table.add_row(*row)
+
+        console.print(ch_table)
+
 
 def _update_readme(all_metrics: list[dict], run_id: str):
     """Rewrite the leaderboard section of README.md with fresh results."""
     if not README_PATH.exists():
         return
 
-    readme = README_PATH.read_text()
+    readme = README_PATH.read_text(encoding="utf-8")
     leaderboard_md = _build_leaderboard_md(all_metrics, run_id)
 
     start_marker = "<!-- LEADERBOARD_START -->"
@@ -179,7 +294,7 @@ def _update_readme(all_metrics: list[dict], run_id: str):
     else:
         readme += "\n" + start_marker + "\n" + leaderboard_md + "\n" + end_marker
 
-    README_PATH.write_text(readme)
+    README_PATH.write_text(readme, encoding="utf-8")
 
 
 def _build_leaderboard_md(all_metrics: list[dict], run_id: str) -> str:
@@ -196,16 +311,17 @@ def _build_leaderboard_md(all_metrics: list[dict], run_id: str) -> str:
 
         lines.append(f"### {scenario_name.replace('_', '-').title()}")
         lines.append("")
-        lines.append("| Tool | Version | ROI Accuracy | Pairwise Ranking | Spearman ρ | Top-1 Correct | Converged | Runtime |")
-        lines.append("|------|---------|-------------|-----------------|------------|---------------|-----------|---------|")
+        lines.append("| Tool | Version | Rel ROI Acc | Abs ROI Acc | Pairwise Ranking | Spearman rho | Top-1 | Converged | Runtime |")
+        lines.append("|------|---------|------------|------------|-----------------|------------|-------|-----------|---------|")
 
-        for m in sorted(scenario_metrics, key=lambda x: x["roi_accuracy"], reverse=True):
-            converged = "✓" if m["converged"] else "⚠"
-            top1 = "✓" if m["top1_correct"] else "✗"
+        for m in sorted(scenario_metrics, key=lambda x: x["rel_roi_accuracy"], reverse=True):
+            converged = "Y" if m["converged"] else "!"
+            top1 = "Y" if m["top1_correct"] else "N"
             cost = f" (~${m['estimated_cost_usd']:.0f})" if m["estimated_cost_usd"] else ""
             lines.append(
                 f"| {m['tool']} | {m['version']} "
-                f"| {m['roi_accuracy']:.1%} "
+                f"| {m['rel_roi_accuracy']:.1%} "
+                f"| {m['abs_roi_accuracy']:.1%} "
                 f"| {m['pairwise_accuracy']:.1%} "
                 f"| {m['spearman_rho']:.2f} "
                 f"| {top1} "

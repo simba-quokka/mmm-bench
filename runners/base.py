@@ -21,7 +21,7 @@ class RunResult:
     scenario_name: str
 
     # Core outputs — required
-    estimated_rois: dict[str, float]        # channel -> estimated ROI
+    estimated_rois: dict[str, float]        # channel -> estimated ROI (spend-denominated)
 
     # Optional outputs
     estimated_contribution_share: dict[str, float] = field(default_factory=dict)
@@ -51,12 +51,32 @@ class BenchmarkRunner(ABC):
         """Version string of the tool being benchmarked."""
 
     @abstractmethod
-    def _run(self, df: pd.DataFrame, channels: list[str], kpi_col: str) -> RunResult:
-        """Run the tool and return results. Implement per-tool logic here."""
+    def _run(
+        self,
+        df: pd.DataFrame,
+        channels: list[str],
+        kpi_col: str,
+        control_cols: list[str],
+    ) -> RunResult:
+        """
+        Run the tool and return results. Implement per-tool logic here.
 
-    def run(self, df: pd.DataFrame, channels: list[str], kpi_col: str = "kpi") -> RunResult:
+        Column conventions:
+          df[ch]             — media activity variable (impressions / GRPs)
+          df[f'{ch}_spend']  — weekly spend in $ (ROI denominator)
+          df[ctrl]           — control variable
+          df[kpi_col]        — KPI (e.g. revenue)
+        """
+
+    def run(
+        self,
+        df: pd.DataFrame,
+        channels: list[str],
+        kpi_col: str = "kpi",
+        control_cols: list[str] | None = None,
+    ) -> RunResult:
         """Timed wrapper around _run."""
         t0 = time.perf_counter()
-        result = self._run(df, channels, kpi_col)
+        result = self._run(df, channels, kpi_col, control_cols or [])
         result.runtime_seconds = time.perf_counter() - t0
         return result

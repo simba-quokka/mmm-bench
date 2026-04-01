@@ -44,7 +44,13 @@ class DecisionPacksRunner(BenchmarkRunner):
     def tool_version(self) -> str:
         return _version
 
-    def _run(self, df: pd.DataFrame, channels: list[str], kpi_col: str) -> RunResult:
+    def _run(
+        self,
+        df: pd.DataFrame,
+        channels: list[str],
+        kpi_col: str,
+        control_cols: list[str],
+    ) -> RunResult:
         if not DECISION_LAB_AVAILABLE:
             return RunResult(
                 tool_name=self.tool_name,
@@ -65,11 +71,15 @@ class DecisionPacksRunner(BenchmarkRunner):
 
             # Build prompt for the MMM pack
             channel_list = ", ".join(channels)
+            spend_list = ", ".join(f"{ch}_spend" for ch in channels)
+            ctrl_list = ", ".join(control_cols) if control_cols else "none"
             prompt = (
                 f"Run an MMM analysis on this dataset. "
                 f"KPI column: {kpi_col}. "
-                f"Media channels: {channel_list}. "
-                f"Return estimated ROI per channel."
+                f"Media activity columns (impressions/GRPs): {channel_list}. "
+                f"Media spend columns ($ spend, ROI denominator): {spend_list}. "
+                f"Control variables: {ctrl_list}. "
+                f"Return estimated ROI per channel (KPI contribution / spend)."
             )
 
             # Shell out to decision-lab CLI

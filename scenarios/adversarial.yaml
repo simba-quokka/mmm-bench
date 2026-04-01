@@ -1,51 +1,83 @@
-# Adversarial scenario: high noise, high multicollinearity, mid-flight budget shift
-# Hard case — tests robustness. Expect wider CIs and lower accuracy across all tools.
-# The goal here isn't to pick a winner but to see which tools acknowledge uncertainty
-# rather than producing confident-but-wrong estimates.
+# Adversarial CPG scenario — high noise, high multicollinearity, mid-flight budget shift.
+# TV and OOH highly correlated (r=0.85); search and social highly correlated (r=0.75).
+# Spend barely varies week-to-week for brand channels (hard to identify).
+# Expect wider credible intervals and lower accuracy. Tests epistemic honesty.
 
 name: adversarial
-description: "High noise, 3 highly correlated channels, budget shift at week 60, tests epistemic honesty"
+description: "CPG 4-channel, high noise, highly correlated brand+perf channels, flat spend — tests uncertainty"
 n_weeks: 130
 seed: 13
-baseline: 80000
-trend_slope: -15.0       # slight downward trend (brand decay)
-seasonality_amplitude: 0.2
-noise_sigma: 8000        # high noise — ~10% of baseline
+baseline: 800000
+trend_slope: -200.0          # slight downward trend (brand erosion)
+seasonality_amplitude: 0.18
+noise_sigma: 60000           # high noise — ~7.5% of baseline
 
 channels:
   - name: tv
     spend_mean: 100000
-    spend_std: 10000     # low variance — spend barely changes (hard to identify)
+    spend_std: 8000            # low variance → hard to identify TV effect
+    spend_pattern: flighted
+    flight_on_rate: 0.60
+    cpm: 21.0
+    cpm_cv: 0.10
     adstock_type: delayed
-    decay: 0.7
+    decay: 0.70
     peak_delay: 3
     alpha: 0.6
-    true_coefficient: 0.22
+    true_coefficient: 15185    # target ROI ~0.20
 
   - name: ooh
     spend_mean: 35000
-    spend_std: 4000      # also low variance
+    spend_std: 3500            # very flat — highly correlated with TV
+    spend_pattern: flighted
+    flight_on_rate: 0.60
+    cpm: 6.0
+    cpm_cv: 0.08
     adstock_type: geometric
     decay: 0.55
     alpha: 0.85
-    true_coefficient: 0.15
+    true_coefficient: 5309     # target ROI ~0.13
     correlated_with: 0
-    correlation: 0.85    # very highly correlated with TV
+    correlation: 0.85
 
   - name: paid_search
     spend_mean: 45000
     spend_std: 18000
+    spend_pattern: always_on
+    cpm: 8.0
+    cpm_cv: 0.22
     adstock_type: geometric
-    decay: 0.2
+    decay: 0.20
     alpha: 1.3
-    true_coefficient: 1.1
+    true_coefficient: 159110   # target ROI ~1.15
 
   - name: paid_social
     spend_mean: 40000
     spend_std: 16000
+    spend_pattern: always_on
+    cpm: 9.5
+    cpm_cv: 0.24
     adstock_type: geometric
-    decay: 0.3
+    decay: 0.30
     alpha: 1.0
-    true_coefficient: 0.7
+    true_coefficient: 90121    # target ROI ~0.72
     correlated_with: 2
-    correlation: 0.75    # highly correlated with paid_search
+    correlation: 0.75
+
+controls:
+  - name: price_index
+    true_coefficient: -240000
+    pattern: ar1
+    ar1_rho: 0.88
+    ar1_std: 0.05
+
+  - name: competitor_adspend
+    true_coefficient: -75000
+    pattern: ar1
+    ar1_rho: 0.72
+    ar1_std: 1.0
+
+  - name: trade_promo
+    true_coefficient: 220000
+    pattern: binary
+    binary_rate: 0.15
