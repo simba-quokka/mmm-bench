@@ -116,4 +116,4 @@ Open an issue to propose a new scenario or metric before building.
 
 ---
 
-*Maintained by [Quokka](https://github.com/simba-quokka) · Built on [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing) · Part of the [Simba](https://simba-mmm.com) ecosystem*
+*Maintained by [Quokka](https://github.com/simba-quokka) · Built on [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing) · Part of the [Simba](https://getsimba.ai) ecosystem*
