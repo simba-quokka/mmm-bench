@@ -1,0 +1,82 @@
+# Complex scenario: 8 channels, 3 years, correlated spend, delayed adstock
+# Mid-difficulty — tests handling of multicollinearity and varied adstock types.
+
+name: complex
+description: "8 channels, 3 years, correlated spend (TV/OOH, Search/Social), delayed adstock on brand"
+n_weeks: 156
+seed: 99
+baseline: 120000
+trend_slope: 25.0
+seasonality_amplitude: 0.15
+noise_sigma: 3000
+
+channels:
+  - name: tv
+    spend_mean: 120000
+    spend_std: 35000
+    adstock_type: delayed
+    decay: 0.55
+    peak_delay: 2
+    alpha: 0.7
+    true_coefficient: 0.28
+
+  - name: ooh
+    spend_mean: 40000
+    spend_std: 8000
+    adstock_type: geometric
+    decay: 0.5
+    alpha: 0.9
+    true_coefficient: 0.18
+    correlated_with: 0   # correlated with tv (brand campaigns run together)
+    correlation: 0.65
+
+  - name: paid_search
+    spend_mean: 50000
+    spend_std: 12000
+    adstock_type: geometric
+    decay: 0.18
+    alpha: 1.4
+    true_coefficient: 1.35
+
+  - name: paid_social
+    spend_mean: 45000
+    spend_std: 15000
+    adstock_type: geometric
+    decay: 0.3
+    alpha: 1.0
+    true_coefficient: 0.85
+    correlated_with: 2   # correlated with paid_search (performance budget moves together)
+    correlation: 0.55
+
+  - name: display
+    spend_mean: 20000
+    spend_std: 8000
+    adstock_type: geometric
+    decay: 0.25
+    alpha: 1.8
+    true_coefficient: 0.45
+
+  - name: email
+    spend_mean: 5000
+    spend_std: 2000
+    adstock_type: geometric
+    decay: 0.1
+    alpha: 2.5
+    true_coefficient: 2.1
+
+  - name: youtube
+    spend_mean: 35000
+    spend_std: 12000
+    adstock_type: delayed
+    decay: 0.45
+    peak_delay: 1
+    alpha: 1.1
+    true_coefficient: 0.6
+
+  - name: affiliates
+    spend_mean: 15000
+    spend_std: 5000
+    adstock_type: geometric
+    decay: 0.05
+    alpha: 3.0
+    true_coefficient: 1.8

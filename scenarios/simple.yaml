@@ -1,0 +1,36 @@
+# Simple scenario: 3 channels, 2 years weekly, clean data, no correlation
+# Easy case — all tools should perform well here.
+
+name: simple
+description: "3 channels, 2 years weekly data, independent spend, low noise"
+n_weeks: 104
+seed: 42
+baseline: 50000
+trend_slope: 10.0
+seasonality_amplitude: 0.12
+noise_sigma: 1500
+
+channels:
+  - name: tv
+    spend_mean: 80000
+    spend_std: 20000
+    adstock_type: geometric
+    decay: 0.65
+    alpha: 0.8
+    true_coefficient: 0.35
+
+  - name: paid_search
+    spend_mean: 30000
+    spend_std: 8000
+    adstock_type: geometric
+    decay: 0.2
+    alpha: 1.5
+    true_coefficient: 1.2
+
+  - name: paid_social
+    spend_mean: 25000
+    spend_std: 10000
+    adstock_type: geometric
+    decay: 0.35
+    alpha: 1.1
+    true_coefficient: 0.75

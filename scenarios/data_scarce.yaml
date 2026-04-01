@@ -1,0 +1,45 @@
+# Data-scarce scenario: 18 months, new channel with only 6 months history
+# Tests prior handling — tools with good priors should outperform here.
+
+name: data_scarce
+description: "18 months weekly, TikTok only has 6 months history, tests prior-dependent tools"
+n_weeks: 78
+seed: 7
+baseline: 35000
+trend_slope: 50.0
+seasonality_amplitude: 0.18
+noise_sigma: 2000
+
+channels:
+  - name: paid_search
+    spend_mean: 40000
+    spend_std: 10000
+    adstock_type: geometric
+    decay: 0.2
+    alpha: 1.4
+    true_coefficient: 1.1
+
+  - name: paid_social
+    spend_mean: 30000
+    spend_std: 12000
+    adstock_type: geometric
+    decay: 0.35
+    alpha: 1.0
+    true_coefficient: 0.8
+
+  - name: tv
+    spend_mean: 60000
+    spend_std: 25000
+    adstock_type: geometric
+    decay: 0.6
+    alpha: 0.75
+    true_coefficient: 0.3
+
+  - name: tiktok
+    # Only active for last 26 weeks — simulated by low spend for first 52 weeks
+    spend_mean: 8000
+    spend_std: 5000
+    adstock_type: geometric
+    decay: 0.25
+    alpha: 1.2
+    true_coefficient: 0.95
