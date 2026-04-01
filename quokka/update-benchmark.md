@@ -134,7 +134,7 @@ query = '''mutation CreatePR($repoId: ID!, $base: String!, $head: String!, $titl
 payload = {
     'query': query,
     'variables': {
-        'repoId': 'MMMBENCH_REPO_ID',  # fill after repo creation
+        'repoId': 'R_kgDOR2_kCw',  # simba-quokka/mmm-bench
         'base': 'main',
         'head': branch,
         'title': f'benchmark: leaderboard update {datetime.date.today()}',
