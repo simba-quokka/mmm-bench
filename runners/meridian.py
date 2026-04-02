@@ -52,6 +52,7 @@ class MeridianRunner(BenchmarkRunner):
         channels: list[str],
         kpi_col: str,
         control_cols: list[str],
+        df_test: pd.DataFrame | None = None,
     ) -> RunResult:
         if not AVAILABLE:
             return RunResult(
@@ -95,27 +96,21 @@ class MeridianRunner(BenchmarkRunner):
             )
         )
 
-        # Add control variables if the builder supports it
+        # Add control variables via with_controls (non-media regressors).
+        # Note: with_organic_media is wrong here — it applies adstock/saturation
+        # to controls, which inflates their effect and distorts ROI attribution.
         if control_cols:
             try:
-                build_chain = build_chain.with_organic_media(
+                build_chain = build_chain.with_controls(
                     data,
-                    organic_media_cols=control_cols,
-                    organic_media_channels=control_cols,
+                    control_cols=control_cols,
                     time_col="date",
                     geo_col="geo",
                 )
-            except Exception:
-                # Fall back to controls API if organic_media not available
-                try:
-                    build_chain = build_chain.with_controls(
-                        data,
-                        control_cols=control_cols,
-                        time_col="date",
-                        geo_col="geo",
-                    )
-                except Exception:
-                    pass  # skip controls if no compatible API
+            except Exception as e:
+                convergence_warnings.append(
+                    f"Controls skipped ({len(control_cols)} cols): {e}"
+                )
 
         input_data = build_chain.build()
 
@@ -190,6 +185,29 @@ class MeridianRunner(BenchmarkRunner):
         if total > 0:
             estimated_shares = {ch: v / total for ch, v in valid.items()}
 
+        # --- Fitted KPI for in-sample fit index ---
+        raw_output = {}
+        try:
+            outcome = analyzer.expected_outcome(use_posterior=True)
+            outcome_arr = np.array(outcome)
+            # Shape: (samples, times) or (chains, draws, times)
+            if outcome_arr.ndim == 3:
+                fitted_kpi = outcome_arr.reshape(-1, outcome_arr.shape[-1]).mean(axis=0)
+            elif outcome_arr.ndim == 2:
+                fitted_kpi = outcome_arr.mean(axis=0)
+            else:
+                fitted_kpi = outcome_arr
+            raw_output["fitted_kpi"] = fitted_kpi
+            raw_output["actual_kpi"] = df[kpi_col].values
+        except Exception:
+            pass
+
+        # --- Holdout prediction ---
+        # Meridian 1.5.x doesn't support predict-on-new-data directly.
+        # Holdout MAPE will be None for Meridian until a prediction API is available.
+        if df_test is not None:
+            raw_output["holdout_mape"] = None
+
         return RunResult(
             tool_name=self.tool_name,
             tool_version=self.tool_version,
@@ -199,4 +217,5 @@ class MeridianRunner(BenchmarkRunner):
             credible_intervals=credible_intervals,
             converged=converged,
             convergence_warnings=convergence_warnings,
+            raw_output=raw_output,
         )

@@ -51,6 +51,7 @@ class PyMCMarketingRunner(BenchmarkRunner):
         channels: list[str],
         kpi_col: str,
         control_cols: list[str],
+        df_test: pd.DataFrame | None = None,
     ) -> RunResult:
         if not AVAILABLE:
             raise RuntimeError("pip install pymc-marketing")
@@ -158,11 +159,51 @@ class PyMCMarketingRunner(BenchmarkRunner):
         except Exception:
             pass
 
-        # --- Contribution shares ---
-        valid = {ch: v for ch, v in estimated_rois.items() if v is not None}
-        total = sum(valid.values())
-        if total > 0:
-            estimated_shares = {ch: v / total for ch, v in valid.items()}
+        # --- Contribution shares (from actual contribution sums, not ROIs) ---
+        try:
+            contrib_sums = {}
+            for ch in channels:
+                if ch in num_contrib.columns:
+                    contrib_sums[ch] = float(num_contrib[ch].sum())
+            total_contrib = sum(contrib_sums.values())
+            if total_contrib > 0:
+                estimated_shares = {ch: v / total_contrib for ch, v in contrib_sums.items()}
+        except Exception:
+            # Fallback: derive from ROIs (less accurate but functional)
+            valid = {ch: v for ch, v in estimated_rois.items() if v is not None}
+            total = sum(valid.values())
+            if total > 0:
+                estimated_shares = {ch: v / total for ch, v in valid.items()}
+
+        # --- Fitted KPI for in-sample fit index ---
+        raw_output = {"idata": mmm.idata}
+        try:
+            fitted_kpi = num_contrib.sum(axis=1).values
+            raw_output["fitted_kpi"] = fitted_kpi
+            raw_output["actual_kpi"] = df[kpi_col].values
+        except Exception:
+            pass
+
+        # --- Holdout prediction ---
+        if df_test is not None:
+            try:
+                feature_cols_test = ["date"] + channels + control_cols
+                X_test = df_test[feature_cols_test].copy()
+                ppc = mmm.predict(X_test)
+                predicted_kpi = ppc.mean(("chain", "draw")).values
+                actual_test = df_test[kpi_col].values
+                mask = np.abs(actual_test) > 1e-6
+                if mask.sum() > 0:
+                    holdout_mape = float(np.mean(
+                        np.abs(actual_test[mask] - predicted_kpi[mask]) / np.abs(actual_test[mask])
+                    ))
+                else:
+                    holdout_mape = None
+                raw_output["holdout_mape"] = holdout_mape
+                raw_output["holdout_actual"] = actual_test
+                raw_output["holdout_predicted"] = predicted_kpi
+            except Exception as e:
+                convergence_warnings.append(f"Holdout prediction failed: {e}")
 
         return RunResult(
             tool_name=self.tool_name,
@@ -173,5 +214,5 @@ class PyMCMarketingRunner(BenchmarkRunner):
             credible_intervals=credible_intervals,
             converged=converged,
             convergence_warnings=convergence_warnings,
-            raw_output={"idata": mmm.idata},
+            raw_output=raw_output,
         )

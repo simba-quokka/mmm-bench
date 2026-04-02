@@ -1,0 +1,66 @@
+# Simple CPG scenario with HIGH SEASONALITY — same channel setup as simple.yaml
+# but with 3.5× stronger seasonal swings and lower noise.
+# Tests whether always-on channels absorb the seasonal peak and get over-attributed
+# in high-seasonality environments.
+
+name: simple_high_seasonality
+description: "CPG 3-channel: same as simple but 3.5× seasonal amplitude — tests seasonal confounding"
+n_weeks: 104
+seed: 42
+baseline: 500000
+trend_slope: 150.0
+seasonality_amplitude: 0.35       # vs 0.10 in simple — 3.5× stronger
+noise_sigma: 8000                 # lower noise to isolate the seasonality effect
+
+channels:
+  - name: tv
+    spend_mean: 80000
+    spend_std: 22000
+    spend_pattern: flighted
+    flight_on_rate: 0.55
+    cpm: 22.0
+    cpm_cv: 0.12
+    adstock_type: geometric
+    decay: 0.65
+    alpha: 0.8
+    true_coefficient: 22971
+
+  - name: paid_search
+    spend_mean: 30000
+    spend_std: 8000
+    spend_pattern: always_on
+    cpm: 8.0
+    cpm_cv: 0.18
+    adstock_type: geometric
+    decay: 0.20
+    alpha: 1.5
+    true_coefficient: 112549
+
+  - name: paid_social
+    spend_mean: 25000
+    spend_std: 10000
+    spend_pattern: always_on
+    cpm: 9.0
+    cpm_cv: 0.20
+    adstock_type: geometric
+    decay: 0.35
+    alpha: 1.1
+    true_coefficient: 57599
+
+controls:
+  - name: price_index
+    true_coefficient: -120000
+    pattern: ar1
+    ar1_rho: 0.85
+    ar1_std: 0.05
+
+  - name: distribution_index
+    true_coefficient: 80000
+    pattern: trend
+    trend_slope: 0.008
+
+  - name: competitor_adspend
+    true_coefficient: -45000
+    pattern: ar1
+    ar1_rho: 0.70
+    ar1_std: 1.0
