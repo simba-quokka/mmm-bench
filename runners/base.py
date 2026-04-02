@@ -57,6 +57,7 @@ class BenchmarkRunner(ABC):
         channels: list[str],
         kpi_col: str,
         control_cols: list[str],
+        df_test: pd.DataFrame | None = None,
     ) -> RunResult:
         """
         Run the tool and return results. Implement per-tool logic here.
@@ -66,6 +67,8 @@ class BenchmarkRunner(ABC):
           df[f'{ch}_spend']  — weekly spend in $ (ROI denominator)
           df[ctrl]           — control variable
           df[kpi_col]        — KPI (e.g. revenue)
+
+        df_test: optional holdout data for out-of-sample prediction.
         """
 
     def run(
@@ -74,9 +77,10 @@ class BenchmarkRunner(ABC):
         channels: list[str],
         kpi_col: str = "kpi",
         control_cols: list[str] | None = None,
+        df_test: pd.DataFrame | None = None,
     ) -> RunResult:
         """Timed wrapper around _run."""
         t0 = time.perf_counter()
-        result = self._run(df, channels, kpi_col, control_cols or [])
+        result = self._run(df, channels, kpi_col, control_cols or [], df_test=df_test)
         result.runtime_seconds = time.perf_counter() - t0
         return result

@@ -1,0 +1,48 @@
+# Simple CPG scenario WITHOUT controls — same media setup as simple.yaml
+# but no price, distribution, or competitor regressors.
+# Shows how much control variables help identify always-on channel ROIs.
+# Expected: worse absolute ROI accuracy without controls.
+
+name: simple_no_controls
+description: "CPG 3-channel: same as simple but no control variables — tests control importance"
+n_weeks: 104
+seed: 42
+baseline: 500000
+trend_slope: 150.0
+seasonality_amplitude: 0.10
+noise_sigma: 12000
+
+channels:
+  - name: tv
+    spend_mean: 80000
+    spend_std: 22000
+    spend_pattern: flighted
+    flight_on_rate: 0.55
+    cpm: 22.0
+    cpm_cv: 0.12
+    adstock_type: geometric
+    decay: 0.65
+    alpha: 0.8
+    true_coefficient: 22971
+
+  - name: paid_search
+    spend_mean: 30000
+    spend_std: 8000
+    spend_pattern: always_on
+    cpm: 8.0
+    cpm_cv: 0.18
+    adstock_type: geometric
+    decay: 0.20
+    alpha: 1.5
+    true_coefficient: 112549
+
+  - name: paid_social
+    spend_mean: 25000
+    spend_std: 10000
+    spend_pattern: always_on
+    cpm: 9.0
+    cpm_cv: 0.20
+    adstock_type: geometric
+    decay: 0.35
+    alpha: 1.1
+    true_coefficient: 57599
