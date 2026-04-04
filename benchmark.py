@@ -19,7 +19,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from data.generator import simulate_dataset
+from data.generator import simulate_dataset, generate_lift_tests
 from scenarios import load_scenario, load_all_scenarios
 from runners import PyMCMarketingRunner, PyMCMarketingTanhRunner, MeridianRunner, DecisionPacksRunner
 from metrics import compute_all_metrics
@@ -39,6 +39,7 @@ RUNNERS = {
 
 SCENARIO_NAMES = [
     "simple", "simple_no_controls", "simple_high_seasonality",
+    "simple_with_lift",
     "complex", "data_scarce", "adversarial",
 ]
 HOLDOUT_WEEKS = 13
@@ -89,6 +90,15 @@ def run(
             df_train = df
             df_test = None
 
+        # Generate lift tests if scenario requests them
+        lift_test_df = None
+        if sc.has_lift_tests:
+            lift_test_df = generate_lift_tests(sc, df, ground_truth)
+            console.print(
+                f"  Lift tests: {len(lift_test_df)} channels "
+                f"({', '.join(lift_test_df['channel'].tolist())})"
+            )
+
         for tool_name in tools_to_run:
             runner_cls = RUNNERS.get(tool_name)
             if runner_cls is None:
@@ -99,7 +109,10 @@ def run(
             console.print(f"\n  Running [bold]{tool_name}[/bold] v{runner.tool_version}...")
 
             try:
-                result = runner.run(df_train, channels, control_cols=control_cols, df_test=df_test)
+                result = runner.run(
+                    df_train, channels, control_cols=control_cols,
+                    df_test=df_test, lift_test_df=lift_test_df,
+                )
                 result.scenario_name = scenario_name
             except Exception as e:
                 console.print(f"  [red]FAILED: {e}[/red]")

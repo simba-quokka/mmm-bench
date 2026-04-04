@@ -51,6 +51,7 @@ class DecisionPacksRunner(BenchmarkRunner):
         kpi_col: str,
         control_cols: list[str],
         df_test: pd.DataFrame | None = None,
+        lift_test_df: pd.DataFrame | None = None,
     ) -> RunResult:
         if not DECISION_LAB_AVAILABLE:
             return RunResult(

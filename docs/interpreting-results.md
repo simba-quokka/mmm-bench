@@ -56,6 +56,9 @@ Business sense: 3/3 (100.0%)
 
 Relative ROI Accuracy: 74.3%
 Absolute ROI Accuracy: 38.2%   ← low due to always-on over-attribution
+Contribution Share Accuracy: 81.2%
+Fit Index: 92.4% (R²=0.94, MAPE=7.2%, WAPE=6.1%)
+Composite Score: 76.8%
 ```
 
 ### Colour coding
@@ -231,6 +234,54 @@ This is the most trusted metric in practitioner MMM because it does not require 
 - **> 25%**: Poor — model does not generalise; do not use for forecasting
 
 **Important:** Low holdout MAPE does not guarantee good attribution. A model can predict well while attributing revenue to the wrong channels (e.g., by using the trend as a proxy for always-on channels). Always check both holdout MAPE and ROI accuracy.
+
+### Contribution Share Accuracy
+
+How well the tool recovers the true percentage share of total media contribution per channel:
+
+```
+Contribution Share MAPE = mean_ch( |true_share(ch) - est_share(ch)| / true_share(ch) )
+Contribution Share Accuracy = 1 - Contribution Share MAPE
+```
+
+More robust than absolute ROI — even when always-on channels are over-attributed, their share of total contribution may still be approximately correct.
+
+- **> 80%**: Excellent — reliable for budget allocation
+- **60–80%**: Good — directionally useful
+- **< 60%**: Poor — contribution decomposition is unreliable
+
+### In-sample Fit Index
+
+Combined measure of how well the model fits the training data:
+
+```
+Fit Index = (R² + (1 - MAPE) + (1 - WAPE)) / 3    [each clipped to 0–1]
+```
+
+- **> 85%**: Good — model captures the data structure
+- **70–85%**: Acceptable — some residual structure unexplained
+- **< 70%**: Poor — ROI estimates should not be trusted
+
+**Important:** Good in-sample fit does not guarantee good ROI attribution. A model can fit perfectly while attributing revenue to the wrong channels (overfitting). Always check fit index alongside ROI accuracy and holdout MAPE.
+
+### Composite Score
+
+The single headline metric for the leaderboard:
+
+```
+Composite = 0.30 × Relative ROI Accuracy
+          + 0.20 × Holdout Accuracy
+          + 0.20 × Contribution Share Accuracy
+          + 0.15 × Business Sense Score
+          + 0.15 × Fit Index
+```
+
+Components that are unavailable are excluded and their weight redistributed. Runtime is not included — it is reported separately.
+
+- **> 80%**: Excellent overall performance
+- **60–80%**: Good — reliable for most use cases
+- **40–60%**: Marginal — investigate component scores
+- **< 40%**: Poor — check convergence and model specification
 
 ### Business Sense Score
 

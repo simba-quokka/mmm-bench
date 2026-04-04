@@ -93,3 +93,6 @@ class Scenario:
 
     # Budget constraint for optimization metrics
     total_budget: float | None = None   # If None, uses sum of mean spends
+
+    # Lift test configuration
+    has_lift_tests: bool = False         # If True, generate synthetic lift test data

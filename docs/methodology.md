@@ -145,6 +145,58 @@ This is the most trusted metric in practitioner MMM because:
 2. It tests whether the model captures the genuine data-generating structure (good models generalise; overfit or underspecified models do not)
 3. A low holdout MAPE is necessary but not sufficient for correct attribution. A model can fit and predict well while attributing revenue to the wrong channels. But a model with high holdout MAPE is almost certainly wrong.
 
+### Contribution Share Accuracy
+
+Measures how accurately the tool recovers the true percentage share of total media contribution per channel:
+
+```
+true_share(ch) = contribution(ch).sum() / Σ_all_ch contribution(ch).sum()
+est_share(ch)  = estimated_contribution(ch) / Σ_all_ch estimated_contribution(ch)
+
+Contribution Share MAPE = mean_ch( |true_share - est_share| / true_share )
+Contribution Share Accuracy = 1 - Contribution Share MAPE
+```
+
+This metric is more robust than absolute ROI across tools with different saturation parameterisations. Even when absolute ROIs are biased by the always-on identification problem, the *shares* of total contribution may still be approximately correct — and shares are what drive budget allocation decisions.
+
+- **> 80%**: Excellent — share estimates are reliable for allocation
+- **60–80%**: Good — directionally useful
+- **< 60%**: Poor — contribution decomposition is unreliable
+
+### In-sample Fit Index
+
+Three components combined into a single score measuring how well the model fits the training data:
+
+```
+R² = 1 - Σ(KPI_actual - KPI_fitted)² / Σ(KPI_actual - mean(KPI_actual))²
+MAPE = mean_t( |KPI_actual_t - KPI_fitted_t| / KPI_actual_t )
+WAPE = Σ|KPI_actual - KPI_fitted| / Σ KPI_actual
+
+Fit Index = (clip(R², 0, 1) + clip(1 - MAPE, 0, 1) + clip(1 - WAPE, 0, 1)) / 3
+```
+
+A model with poor fit has meaningless ROI estimates regardless of what they say. The fit index provides a basic quality gate.
+
+- **> 85%**: Good — model captures the data structure
+- **70–85%**: Acceptable — some residual structure unexplained
+- **< 70%**: Poor — model is misspecified; ROI estimates should not be trusted
+
+### Composite Score
+
+The single headline metric for the leaderboard, combining all component metrics:
+
+```
+Composite = 0.30 × Relative ROI Accuracy
+          + 0.20 × Holdout Accuracy
+          + 0.20 × Contribution Share Accuracy
+          + 0.15 × Business Sense Score
+          + 0.15 × Fit Index
+```
+
+If any component is unavailable (e.g. holdout prediction not supported by the tool), its weight is redistributed proportionally to the remaining components. This means no single missing capability disqualifies a tool from scoring, but tools that support more metrics have a truer composite.
+
+Speed (runtime) is reported separately — it is not in the composite because it is an operational metric, not a quality metric.
+
 ### Business Sense Score
 
 For each tool and scenario, we check whether each channel's estimated ROI falls within an industry-plausible range:
@@ -194,19 +246,23 @@ Ceiling performance benchmarks (where each tool is hand-tuned by an expert) are 
 
 ---
 
-## Planned Benchmark Dimensions
+## Benchmark Dimensions
 
-These represent the next phases of the benchmark. Each adds a real-world complication that practitioners encounter:
+### Implemented
+
+1. **Seasonality stress test** — `simple_high_seasonality` scenario: 3.5× seasonal amplitude vs the baseline. Tests whether always-on channels absorb seasonal peaks and get over-attributed.
+
+2. **With/without control variables** — `simple_no_controls` scenario: same data as simple but with all control variables removed. Quantifies the confounding cost of omitting price, distribution, and competitor data.
+
+3. **Holdout evaluation** — 13-week train/test split on all scenarios. Tests generalisation independently of attribution accuracy.
+
+### Planned
 
 1. **Lift test integration** — Geo holdout experiments injected as likelihood observations (not priors). Tests whether tools correctly use this additional data to constrain always-on channels. This is the single highest-value extension because it directly addresses the fundamental limitation of time-series MMM.
 
-2. **Seasonality stress test** — Annual Fourier seasonality with amplitude=0.35, explicit Christmas and summer peaks in both KPI and some media channels. Tests whether seasonality decomposition contaminates media attribution.
+2. **Structural break** — Baseline shift at the dataset midpoint (e.g., 20% step change). Tests whether tools can handle non-stationarity without attributing the break to a media channel.
 
-3. **Structural break** — Baseline shift at the dataset midpoint (e.g., 20% step change). Tests whether tools can handle non-stationarity without attributing the break to a media channel.
-
-4. **Data-sparse only** — 52 weeks only. Shorter than `data_scarce`. Tests the minimum viable data requirement for each tool.
-
-5. **With/without control variables** — Running the same scenario with and without controls quantifies the confounding cost of omitting price, distribution, and competitor data.
+3. **Data-sparse only** — 52 weeks only. Shorter than `data_scarce`. Tests the minimum viable data requirement for each tool.
 
 ---
 

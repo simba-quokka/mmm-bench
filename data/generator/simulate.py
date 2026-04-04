@@ -393,3 +393,88 @@ def simulate_dataset(scenario: Scenario) -> tuple[pd.DataFrame, dict]:
     }
 
     return df, ground_truth
+
+
+# ---------------------------------------------------------------------------
+# Lift test generation
+# ---------------------------------------------------------------------------
+
+def generate_lift_tests(
+    scenario: Scenario,
+    df: pd.DataFrame,
+    ground_truth: dict,
+    channels: list[str] | None = None,
+    start_week: int = 40,
+    end_week: int = 52,
+    spend_uplift: float = 0.20,
+    noise_cv: float = 0.10,
+) -> pd.DataFrame:
+    """
+    Generate synthetic geo-holdout lift test data from the known DGP.
+
+    Simulates an experiment where the treatment geo receives `spend_uplift`
+    more spend for weeks `start_week` to `end_week`. The true incremental
+    outcome is computed from the known saturation curve, with measurement
+    noise added.
+
+    Returns a DataFrame compatible with PyMC-Marketing's
+    ``add_lift_test_measurements()``:
+        - channel: channel name
+        - x: baseline media activity (mean adstocked impressions in control period)
+        - delta_x: additional media activity in treatment
+        - delta_y: observed incremental KPI contribution (with noise)
+        - sigma: measurement noise standard deviation
+
+    Parameters
+    ----------
+    scenario : Scenario definition (for channel configs)
+    df : Full simulated DataFrame
+    ground_truth : Ground truth dict from simulate_dataset()
+    channels : Which channels to generate lift tests for (default: all)
+    start_week, end_week : Experiment period (row indices)
+    spend_uplift : Fractional increase in spend for treatment (0.20 = +20%)
+    noise_cv : Coefficient of variation for measurement noise
+    """
+    rng = np.random.default_rng(scenario.seed + 999)
+
+    if channels is None:
+        channels = [ch.name for ch in scenario.channels]
+
+    ch_configs = {ch.name: ch for ch in scenario.channels}
+    rows = []
+
+    for ch_name in channels:
+        ch = ch_configs[ch_name]
+
+        # Baseline: mean adstocked impressions during the experiment period
+        adstocked = ground_truth["adstocked"][ch_name]
+        experiment_mask = slice(start_week, end_week + 1)
+        x_baseline = float(np.mean(adstocked[experiment_mask]))
+
+        # Treatment: additional impressions from spend uplift
+        # extra_spend → extra_impressions → adstock → saturation difference
+        spend_in_period = df[f"{ch_name}_spend"].values[experiment_mask]
+        extra_spend = spend_in_period * spend_uplift
+        extra_impressions = extra_spend / ch.cpm * 1000.0
+        x_treatment = x_baseline + float(np.mean(extra_impressions))
+        delta_x = x_treatment - x_baseline
+
+        # True incremental outcome from DGP saturation curve
+        scalar = float(np.max(adstocked)) if np.max(adstocked) > 0 else 1.0
+        sat_baseline = np.tanh(x_baseline / (scalar * ch.alpha + 1e-9))
+        sat_treatment = np.tanh(x_treatment / (scalar * ch.alpha + 1e-9))
+        true_incremental = ch.true_coefficient * (sat_treatment - sat_baseline)
+
+        # Add measurement noise
+        sigma = abs(true_incremental) * noise_cv if true_incremental != 0 else 1.0
+        observed_incremental = true_incremental + rng.normal(0, sigma)
+
+        rows.append({
+            "channel": ch_name,
+            "x": x_baseline,
+            "delta_x": delta_x,
+            "delta_y": float(observed_incremental),
+            "sigma": float(sigma),
+        })
+
+    return pd.DataFrame(rows)

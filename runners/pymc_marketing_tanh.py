@@ -47,6 +47,7 @@ class PyMCMarketingTanhRunner(BenchmarkRunner):
         kpi_col: str,
         control_cols: list[str],
         df_test: pd.DataFrame | None = None,
+        lift_test_df: pd.DataFrame | None = None,
     ) -> RunResult:
         if not AVAILABLE:
             raise RuntimeError("pip install pymc-marketing")
@@ -74,6 +75,13 @@ class PyMCMarketingTanhRunner(BenchmarkRunner):
         mmm.add_original_scale_contribution_variable(
             var=["channel_contribution", "intercept_contribution"]
         )
+
+        # --- Add lift test measurements (before fit) ---
+        if lift_test_df is not None:
+            try:
+                mmm.add_lift_test_measurements(lift_test_df)
+            except Exception as e:
+                convergence_warnings.append(f"Lift test integration failed: {e}")
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")

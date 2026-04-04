@@ -1,0 +1,68 @@
+# Simple CPG scenario WITH LIFT TESTS — same as simple.yaml but with
+# synthetic geo-holdout experiment data for paid_search.
+# Tests whether tools correctly integrate lift test observations to
+# constrain always-on channel ROI estimates.
+# Expected: absolute ROI accuracy on paid_search should jump from ~0% to 40-70%.
+
+name: simple_with_lift
+description: "CPG 3-channel: same as simple + synthetic lift test for paid_search — tests lift integration"
+n_weeks: 104
+seed: 42
+baseline: 500000
+trend_slope: 150.0
+seasonality_amplitude: 0.10
+noise_sigma: 12000
+has_lift_tests: true
+
+channels:
+  - name: tv
+    spend_mean: 80000
+    spend_std: 22000
+    spend_pattern: flighted
+    flight_on_rate: 0.55
+    cpm: 22.0
+    cpm_cv: 0.12
+    adstock_type: geometric
+    decay: 0.65
+    alpha: 0.8
+    true_coefficient: 22971
+
+  - name: paid_search
+    spend_mean: 30000
+    spend_std: 8000
+    spend_pattern: always_on
+    cpm: 8.0
+    cpm_cv: 0.18
+    adstock_type: geometric
+    decay: 0.20
+    alpha: 1.5
+    true_coefficient: 112549
+
+  - name: paid_social
+    spend_mean: 25000
+    spend_std: 10000
+    spend_pattern: always_on
+    cpm: 9.0
+    cpm_cv: 0.20
+    adstock_type: geometric
+    decay: 0.35
+    alpha: 1.1
+    true_coefficient: 57599
+
+controls:
+  - name: price_index
+    true_coefficient: -120000
+    pattern: ar1
+    ar1_rho: 0.85
+    ar1_std: 0.05
+
+  - name: distribution_index
+    true_coefficient: 80000
+    pattern: trend
+    trend_slope: 0.008
+
+  - name: competitor_adspend
+    true_coefficient: -45000
+    pattern: ar1
+    ar1_rho: 0.70
+    ar1_std: 1.0
